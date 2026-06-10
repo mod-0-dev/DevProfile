@@ -1,0 +1,11 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+*.user
+
+# Rider / VS
+.idea/
+.vs/
+
+# Test profiles / local scratch
+*.devprofile.bak

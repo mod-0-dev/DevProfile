@@ -1,0 +1,201 @@
+<Window x:Class="DevProfile.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:DevProfile.App"
+        xmlns:vm="clr-namespace:DevProfile.App.ViewModels"
+        mc:Ignorable="d"
+        Title="DevProfile" Height="660" Width="940"
+        FontFamily="Segoe UI" FontSize="13">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <Style TargetType="TextBox" x:Key="LogBox">
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="Background" Value="#1E1E1E"/>
+            <Setter Property="Foreground" Value="#D4D4D4"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="MinWidth" Value="120"/>
+        </Style>
+    </Window.Resources>
+
+    <TabControl x:Name="Tabs" Margin="10">
+        <!-- ============================= CREATE ============================= -->
+        <TabItem Header="Create Profile">
+            <TabItem.Resources>
+                <CollectionViewSource x:Key="GroupedProviders" Source="{Binding Create.Rows}">
+                    <CollectionViewSource.GroupDescriptions>
+                        <PropertyGroupDescription PropertyName="Category"/>
+                    </CollectionViewSource.GroupDescriptions>
+                </CollectionViewSource>
+            </TabItem.Resources>
+            <Grid Margin="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="130"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Tick what to capture from this machine:"
+                           FontWeight="SemiBold" Margin="0,0,0,8"/>
+
+                <ListBox Grid.Row="1" ItemsSource="{Binding Source={StaticResource GroupedProviders}}"
+                         BorderThickness="1" BorderBrush="#DDD"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" FontWeight="Bold"
+                                               Margin="4,8,0,2" Foreground="#444"/>
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </ListBox.GroupStyle>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel Margin="16,2,4,2">
+                                <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding Enabled}"
+                                          Content="{Binding DisplayName}" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding Detail}" Foreground="Gray"
+                                           Margin="10,0,0,0" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <Grid Grid.Row="2" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Export to:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox Grid.Column="1" Text="{Binding Create.Destination, UpdateSourceTrigger=PropertyChanged}"
+                             VerticalContentAlignment="Center" Padding="4"/>
+                    <Button Grid.Column="2" Content="Browse…" Margin="8,0,0,0" Click="BrowseExport_Click"/>
+                </Grid>
+
+                <Grid Grid.Row="3" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Secrets passphrase:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <PasswordBox Grid.Column="1" x:Name="CreatePassphrase" Padding="4"
+                                 PasswordChanged="CreatePassphrase_Changed" VerticalContentAlignment="Center"/>
+                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="Gray"
+                               Text="Only needed if a Secrets item is ticked."/>
+                    <Button Grid.Column="3" Content="Cancel" Margin="0,0,8,0"
+                            Command="{Binding Create.CancelCommand}"
+                            Visibility="{Binding Create.IsBusy, Converter={StaticResource BoolToVis}}"/>
+                    <Button Grid.Column="4" Content="Export Profile" FontWeight="SemiBold"
+                            Command="{Binding Create.ExportCommand}"/>
+                </Grid>
+
+                <ProgressBar Grid.Row="4" Height="4" Margin="0,8,0,0" IsIndeterminate="True"
+                             Visibility="{Binding Create.IsBusy, Converter={StaticResource BoolToVis}}"/>
+
+                <TextBox Grid.Row="5" Style="{StaticResource LogBox}" Margin="0,6,0,0"
+                         Text="{Binding Create.Log, Mode=OneWay}"/>
+            </Grid>
+        </TabItem>
+
+        <!-- ============================= APPLY ============================= -->
+        <TabItem Header="Apply Profile">
+            <Grid Margin="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="130"/>
+                </Grid.RowDefinitions>
+
+                <!-- Admin banner: only when not elevated -->
+                <Border Grid.Row="0" Background="#FFF4E5" BorderBrush="#E0A030" BorderThickness="1"
+                        CornerRadius="4" Padding="10,6" Margin="0,0,0,8"
+                        Visibility="{Binding Apply.NotElevated, Converter={StaticResource BoolToVis}}">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Restart as admin" Click="RestartAsAdmin_Click"/>
+                        <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#7A4E00"
+                                   Text="Not running as Administrator. Package installs and hosts-file changes need elevation — restart as admin before applying."/>
+                    </DockPanel>
+                </Border>
+
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Profile folder:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox Grid.Column="1" Text="{Binding Apply.Source, UpdateSourceTrigger=PropertyChanged}"
+                             VerticalContentAlignment="Center" Padding="4"/>
+                    <Button Grid.Column="2" Content="Browse…" Margin="8,0,0,0" Click="BrowseApply_Click"/>
+                    <Button Grid.Column="3" Content="Load Plan" Margin="8,0,0,0" Command="{Binding Apply.LoadCommand}"/>
+                </Grid>
+
+                <TextBlock Grid.Row="2" Text="{Binding Apply.Summary}" Margin="0,10,0,6" FontWeight="SemiBold"/>
+
+                <DataGrid Grid.Row="3" ItemsSource="{Binding Apply.Plan}" AutoGenerateColumns="False"
+                          CanUserAddRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                          BorderBrush="#DDD" BorderThickness="1">
+                    <DataGrid.Columns>
+                        <DataGridCheckBoxColumn Header="Apply" Binding="{Binding Include, UpdateSourceTrigger=PropertyChanged}" Width="55"/>
+                        <DataGridTextColumn Header="Item" Binding="{Binding Label}" Width="2*"/>
+                        <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="Auto"/>
+                        <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="Auto"/>
+                        <DataGridTextColumn Header="Detail" Binding="{Binding Detail}" Width="3*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <Grid Grid.Row="4" Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Secrets passphrase:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <PasswordBox Grid.Column="1" x:Name="ApplyPassphrase" Padding="4"
+                                 PasswordChanged="ApplyPassphrase_Changed" VerticalContentAlignment="Center"/>
+                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="Gray"
+                               Text="Plan previews before anything runs. Overwrites are backed up (.devprofile.bak)."/>
+                    <Button Grid.Column="3" Content="Cancel" Margin="0,0,8,0"
+                            Command="{Binding Apply.CancelCommand}"
+                            Visibility="{Binding Apply.IsBusy, Converter={StaticResource BoolToVis}}"/>
+                    <Button Grid.Column="4" Content="Apply" FontWeight="SemiBold" Command="{Binding Apply.ApplyCommand}"/>
+                </Grid>
+
+                <ProgressBar Grid.Row="5" Height="4" Margin="0,8,0,0" IsIndeterminate="True"
+                             Visibility="{Binding Apply.IsBusy, Converter={StaticResource BoolToVis}}"/>
+
+                <TextBox Grid.Row="6" Style="{StaticResource LogBox}" Margin="0,6,0,0"
+                         Text="{Binding Apply.Log, Mode=OneWay}"/>
+            </Grid>
+        </TabItem>
+    </TabControl>
+</Window>
