@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: mod-0-dev.DevProfile
+PackageVersion: 0.1.0
+PackageLocale: en-US
+Publisher: mod-0-dev
+PublisherUrl: https://github.com/mod-0-dev
+PackageName: DevProfile
+PackageUrl: https://github.com/mod-0-dev/DevProfile
+License: Proprietary
+ShortDescription: Portable developer-environment snapshot for Windows — capture packages and configs, preview, then replay them on another machine.
+Tags:
+  - developer
+  - environment
+  - dotfiles
+  - winget
+  - backup
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0
