@@ -31,10 +31,13 @@ jobs:
         run: |
           if [ "${{ github.ref_type }}" = "tag" ]; then
             v="${{ github.ref_name }}"; v="${v#v}"          # v1.2.3 -> 1.2.3
+            asset="DevProfile-$v"                            # versioned name; one release per tag
           else
             v="0.1.0-ci.${{ github.run_number }}"           # rolling main build
+            asset="DevProfile"                              # stable name -> overwritten on 'latest'
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
 
       # Gate the release on a green test run so we never ship a broken package.
       - name: Test
@@ -56,12 +59,12 @@ jobs:
         run: >
           Compress-Archive
           -Path publish/${{ matrix.rid }}/*
-          -DestinationPath DevProfile-${{ steps.ver.outputs.version }}-${{ matrix.rid }}.zip
+          -DestinationPath ${{ steps.ver.outputs.asset }}-${{ matrix.rid }}.zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: DevProfile-${{ matrix.rid }}
-          path: DevProfile-*-${{ matrix.rid }}.zip
+          path: ${{ steps.ver.outputs.asset }}-${{ matrix.rid }}.zip
           if-no-files-found: error
 
   release:
