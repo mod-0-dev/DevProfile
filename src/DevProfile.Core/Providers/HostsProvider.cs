@@ -3,7 +3,8 @@ namespace DevProfile.Core.Providers;
 /// <summary>
 /// hosts-file entries. Capture stores the whole file; Apply merges in only the
 /// meaningful lines that are missing (never blows away machine-specific entries),
-/// backing up first. Writing the hosts file requires elevation.
+/// backing up first. Writing the hosts file requires elevation — when the process
+/// isn't elevated, the append is delegated to one elevated child (single UAC prompt).
 /// </summary>
 public sealed class HostsProvider : IProvider
 {
@@ -53,7 +54,7 @@ public sealed class HostsProvider : IProvider
         var missing = have.Count(h => !live.Contains(h));
         if (missing == 0)
             return new[] { new PlanItem(Id, DisplayName, "current", PlanAction.Skip) };
-        return new[] { new PlanItem(Id, DisplayName, $"{missing} missing", PlanAction.Merge, "appends missing entries (needs admin)") };
+        return new[] { new PlanItem(Id, DisplayName, $"{missing} missing", PlanAction.Merge, "appends missing entries (UAC prompt if not admin)") };
     }
 
     public async Task ApplyAsync(string profileDir, PlanItem item, ApplyOptions options, Action<string> log, CancellationToken ct = default)
@@ -82,16 +83,16 @@ public sealed class HostsProvider : IProvider
             await File.AppendAllLinesAsync(_hostsPath, block, ct).ConfigureAwait(false);
             log($"  appended {toAdd.Count} hosts entr{(toAdd.Count == 1 ? "y" : "ies")}");
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException) when (string.Equals(_hostsPath, KnownPaths.Hosts, StringComparison.OrdinalIgnoreCase))
         {
-            log("  ! hosts file is read-only — run DevProfile as Administrator to apply hosts entries.");
+            // The real hosts file needs admin: hand the append to one elevated child process
+            // (a single UAC prompt) instead of asking the user to restart the app elevated.
+            log("  hosts file needs admin — requesting elevation (UAC prompt)…");
+            await HostsElevation.ApplyViaElevatedChildAsync(toAdd, options.BackupOnOverwrite, log, ct).ConfigureAwait(false);
         }
     }
 
-    private static IEnumerable<string> MeaningfulLines(IEnumerable<string> lines) =>
-        lines.Select(l => l.Trim())
-             .Where(l => l.Length > 0 && !l.StartsWith('#'));
+    private static IEnumerable<string> MeaningfulLines(IEnumerable<string> lines) => HostsText.MeaningfulLines(lines);
 
-    private static string Normalize(string line) =>
-        string.Join(' ', line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    private static string Normalize(string line) => HostsText.Normalize(line);
 }

@@ -3,199 +3,294 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:DevProfile.App"
-        xmlns:vm="clr-namespace:DevProfile.App.ViewModels"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
-        Title="DevProfile" Height="660" Width="940"
-        FontFamily="Segoe UI" FontSize="13">
+        Title="DevProfile" Height="720" Width="1040" MinHeight="560" MinWidth="860"
+        WindowStyle="None" ResizeMode="CanResize"
+        Background="{StaticResource BgBrush}" Foreground="{StaticResource TextBrush}"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        WindowStartupLocation="CenterScreen">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="44" ResizeBorderThickness="6"
+                            GlassFrameThickness="1" CornerRadius="0"/>
+    </shell:WindowChrome.WindowChrome>
+
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        <Style TargetType="TextBox" x:Key="LogBox">
-            <Setter Property="IsReadOnly" Value="True"/>
-            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
-            <Setter Property="TextWrapping" Value="NoWrap"/>
-            <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
-            <Setter Property="Background" Value="#1E1E1E"/>
-            <Setter Property="Foreground" Value="#D4D4D4"/>
-        </Style>
-        <Style TargetType="Button">
-            <Setter Property="Padding" Value="14,6"/>
-            <Setter Property="MinWidth" Value="120"/>
-        </Style>
     </Window.Resources>
 
-    <TabControl x:Name="Tabs" Margin="10">
-        <!-- ============================= CREATE ============================= -->
-        <TabItem Header="Create Profile">
-            <TabItem.Resources>
-                <CollectionViewSource x:Key="GroupedProviders" Source="{Binding Create.Rows}">
-                    <CollectionViewSource.GroupDescriptions>
-                        <PropertyGroupDescription PropertyName="Category"/>
-                    </CollectionViewSource.GroupDescriptions>
-                </CollectionViewSource>
-            </TabItem.Resources>
-            <Grid Margin="8">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="130"/>
-                </Grid.RowDefinitions>
+    <!-- Maximized borderless windows overhang the screen by the resize border; pad it back. -->
+    <Border>
+        <Border.Style>
+            <Style TargetType="Border">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}"
+                                 Value="Maximized">
+                        <Setter Property="Margin" Value="7"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
 
-                <TextBlock Grid.Row="0" Text="Tick what to capture from this machine:"
-                           FontWeight="SemiBold" Margin="0,0,0,8"/>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="44"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
-                <ListBox Grid.Row="1" ItemsSource="{Binding Source={StaticResource GroupedProviders}}"
-                         BorderThickness="1" BorderBrush="#DDD"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBox.GroupStyle>
-                        <GroupStyle>
-                            <GroupStyle.HeaderTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Name}" FontWeight="Bold"
-                                               Margin="4,8,0,2" Foreground="#444"/>
-                                </DataTemplate>
-                            </GroupStyle.HeaderTemplate>
-                        </GroupStyle>
-                    </ListBox.GroupStyle>
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                        </Style>
-                    </ListBox.ItemContainerStyle>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <DockPanel Margin="16,2,4,2">
-                                <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding Enabled}"
-                                          Content="{Binding DisplayName}" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding Detail}" Foreground="Gray"
-                                           Margin="10,0,0,0" VerticalAlignment="Center"/>
+            <!-- ============================ Title bar ============================ -->
+            <Grid Grid.Row="0" Background="{StaticResource SidebarBrush}">
+                <StackPanel Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
+                    <Border Width="24" Height="24" CornerRadius="6" Background="{StaticResource AccentGradient}">
+                        <TextBlock Text="&#xEC7A;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="White"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="DevProfile" FontWeight="SemiBold" FontSize="13.5"
+                               Margin="10,0,0,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="VersionText" Foreground="{StaticResource TextDimBrush}" FontSize="11.5"
+                               Margin="8,1,0,0" VerticalAlignment="Center"/>
+                    <Border CornerRadius="9" Background="{StaticResource InstallBg}" Padding="8,2" Margin="12,0,0,0"
+                            VerticalAlignment="Center"
+                            Visibility="{Binding Apply.IsElevated, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE7EF;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                       Foreground="{StaticResource InstallFg}" VerticalAlignment="Center"/>
+                            <TextBlock Text="Administrator" FontSize="11" FontWeight="SemiBold" Margin="5,0,0,0"
+                                       Foreground="{StaticResource InstallFg}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Stretch">
+                    <Button Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="Minimize_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                    <Button Style="{StaticResource CaptionButton}" Click="MaximizeRestore_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="10">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="&#xE922;"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                     Value="Maximized">
+                                            <Setter Property="Text" Value="&#xE923;"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Button>
+                    <Button Style="{StaticResource CloseButton}" Content="&#xE8BB;" Click="Close_Click"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- ============================ Pages ============================ -->
+            <TabControl x:Name="Tabs" Grid.Row="1" Style="{StaticResource SidebarTabs}">
+
+                <!-- ============================= CREATE ============================= -->
+                <TabItem Header="Create" Tag="&#xEDE1;" Style="{StaticResource NavItem}">
+                    <TabItem.Resources>
+                        <CollectionViewSource x:Key="GroupedProviders" Source="{Binding Create.Rows}">
+                            <CollectionViewSource.GroupDescriptions>
+                                <PropertyGroupDescription PropertyName="Category"/>
+                            </CollectionViewSource.GroupDescriptions>
+                        </CollectionViewSource>
+                    </TabItem.Resources>
+                    <Grid Margin="28,22,28,20">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="150"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+                            <TextBlock Text="Create a profile" Style="{StaticResource PageTitle}"/>
+                            <TextBlock Style="{StaticResource PageSubtitle}"
+                                       Text="Tick what to capture from this machine, then export it to a folder you can carry anywhere."/>
+                        </StackPanel>
+
+                        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="4,6">
+                            <ListBox ItemsSource="{Binding Source={StaticResource GroupedProviders}}">
+                                <ListBox.GroupStyle>
+                                    <GroupStyle>
+                                        <GroupStyle.HeaderTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Name}" Style="{StaticResource GroupHeader}"/>
+                                            </DataTemplate>
+                                        </GroupStyle.HeaderTemplate>
+                                    </GroupStyle>
+                                </ListBox.GroupStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="6,0">
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Detail}"
+                                                       Foreground="{StaticResource TextDimBrush}" FontSize="12"
+                                                       Margin="12,0,4,0" VerticalAlignment="Center"/>
+                                            <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding Enabled}"
+                                                      Content="{Binding DisplayName}" VerticalAlignment="Center"/>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+
+                        <Grid Grid.Row="2" Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Export to" Style="{StaticResource FieldLabel}" Margin="0,0,10,0"/>
+                            <TextBox Grid.Column="1" Text="{Binding Create.Destination, UpdateSourceTrigger=PropertyChanged}"/>
+                            <Button Grid.Column="2" Content="Browse…" Margin="10,0,0,0" Click="BrowseExport_Click"/>
+                        </Grid>
+
+                        <!-- Destination already holds a bundle -> offer an in-place refresh -->
+                        <Border Grid.Row="3" Style="{StaticResource InfoBanner}" Margin="0,10,0,0"
+                                Visibility="{Binding Create.HasExistingProfile, Converter={StaticResource BoolToVis}}">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Refresh Profile" Style="{StaticResource PrimaryButton}"
+                                        Command="{Binding Create.RefreshCommand}" VerticalAlignment="Center"/>
+                                <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0">
+                                    <Run Text="Existing profile found: "/><Run Text="{Binding Create.ExistingProfileSummary, Mode=OneWay}"/><Run Text=". Refresh re-captures it from this machine with the same providers."/>
+                                </TextBlock>
                             </DockPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                        </Border>
 
-                <Grid Grid.Row="2" Margin="0,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Export to:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBox Grid.Column="1" Text="{Binding Create.Destination, UpdateSourceTrigger=PropertyChanged}"
-                             VerticalContentAlignment="Center" Padding="4"/>
-                    <Button Grid.Column="2" Content="Browse…" Margin="8,0,0,0" Click="BrowseExport_Click"/>
-                </Grid>
+                        <Grid Grid.Row="4" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Secrets passphrase" Style="{StaticResource FieldLabel}" Margin="0,0,10,0"/>
+                            <PasswordBox Grid.Column="1" x:Name="CreatePassphrase" PasswordChanged="CreatePassphrase_Changed"/>
+                            <TextBlock Grid.Column="2" Style="{StaticResource FieldLabel}" FontSize="12" Margin="12,0,0,0"
+                                       Text="Only needed if a Secrets item is ticked."/>
+                            <Button Grid.Column="3" Content="Cancel" Margin="0,0,10,0"
+                                    Command="{Binding Create.CancelCommand}"
+                                    Visibility="{Binding Create.IsBusy, Converter={StaticResource BoolToVis}}"/>
+                            <Button Grid.Column="4" Content="Export Profile" Style="{StaticResource PrimaryButton}"
+                                    Command="{Binding Create.ExportCommand}"/>
+                        </Grid>
 
-                <Grid Grid.Row="3" Margin="0,8,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="220"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Secrets passphrase:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <PasswordBox Grid.Column="1" x:Name="CreatePassphrase" Padding="4"
-                                 PasswordChanged="CreatePassphrase_Changed" VerticalContentAlignment="Center"/>
-                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="Gray"
-                               Text="Only needed if a Secrets item is ticked."/>
-                    <Button Grid.Column="3" Content="Cancel" Margin="0,0,8,0"
-                            Command="{Binding Create.CancelCommand}"
-                            Visibility="{Binding Create.IsBusy, Converter={StaticResource BoolToVis}}"/>
-                    <Button Grid.Column="4" Content="Export Profile" FontWeight="SemiBold"
-                            Command="{Binding Create.ExportCommand}"/>
-                </Grid>
+                        <ProgressBar Grid.Row="5" Margin="0,12,0,0" IsIndeterminate="True"
+                                     Visibility="{Binding Create.IsBusy, Converter={StaticResource BoolToVis}}"/>
 
-                <ProgressBar Grid.Row="4" Height="4" Margin="0,8,0,0" IsIndeterminate="True"
-                             Visibility="{Binding Create.IsBusy, Converter={StaticResource BoolToVis}}"/>
+                        <TextBox Grid.Row="6" Style="{StaticResource LogBox}" Margin="0,10,0,0"
+                                 Text="{Binding Create.Log, Mode=OneWay}"/>
+                    </Grid>
+                </TabItem>
 
-                <TextBox Grid.Row="5" Style="{StaticResource LogBox}" Margin="0,6,0,0"
-                         Text="{Binding Create.Log, Mode=OneWay}"/>
-            </Grid>
-        </TabItem>
+                <!-- ============================= APPLY ============================= -->
+                <TabItem Header="Apply" Tag="&#xE896;" Style="{StaticResource NavItem}">
+                    <Grid Margin="28,22,28,20">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="150"/>
+                        </Grid.RowDefinitions>
 
-        <!-- ============================= APPLY ============================= -->
-        <TabItem Header="Apply Profile">
-            <Grid Margin="8">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="130"/>
-                </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+                            <TextBlock Text="Apply a profile" Style="{StaticResource PageTitle}"/>
+                            <TextBlock Style="{StaticResource PageSubtitle}"
+                                       Text="Load a profile folder to preview exactly what would change before anything runs."/>
+                        </StackPanel>
 
-                <!-- Admin banner: only when not elevated -->
-                <Border Grid.Row="0" Background="#FFF4E5" BorderBrush="#E0A030" BorderThickness="1"
-                        CornerRadius="4" Padding="10,6" Margin="0,0,0,8"
-                        Visibility="{Binding Apply.NotElevated, Converter={StaticResource BoolToVis}}">
-                    <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="Restart as admin" Click="RestartAsAdmin_Click"/>
-                        <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Foreground="#7A4E00"
-                                   Text="Not running as Administrator. Package installs and hosts-file changes need elevation — restart as admin before applying."/>
-                    </DockPanel>
-                </Border>
+                        <!-- Not elevated: informational only — hosts elevates itself with one UAC prompt now -->
+                        <Border Grid.Row="1" Style="{StaticResource InfoBanner}" Margin="0,0,0,12"
+                                Visibility="{Binding Apply.NotElevated, Converter={StaticResource BoolToVis}}">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Restart as admin" Click="RestartAsAdmin_Click"
+                                        VerticalAlignment="Center"/>
+                                <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0"
+                                           Text="Not running as Administrator — that's fine: hosts changes will show a single UAC prompt during apply, and winget installers may prompt individually. Restart as admin to avoid the prompts."/>
+                            </DockPanel>
+                        </Border>
 
-                <Grid Grid.Row="1">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Profile folder:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <TextBox Grid.Column="1" Text="{Binding Apply.Source, UpdateSourceTrigger=PropertyChanged}"
-                             VerticalContentAlignment="Center" Padding="4"/>
-                    <Button Grid.Column="2" Content="Browse…" Margin="8,0,0,0" Click="BrowseApply_Click"/>
-                    <Button Grid.Column="3" Content="Load Plan" Margin="8,0,0,0" Command="{Binding Apply.LoadCommand}"/>
-                </Grid>
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Profile folder" Style="{StaticResource FieldLabel}" Margin="0,0,10,0"/>
+                            <TextBox Grid.Column="1" Text="{Binding Apply.Source, UpdateSourceTrigger=PropertyChanged}"/>
+                            <Button Grid.Column="2" Content="Browse…" Margin="10,0,0,0" Click="BrowseApply_Click"/>
+                            <Button Grid.Column="3" Content="Load Plan" Margin="10,0,0,0" Command="{Binding Apply.LoadCommand}"/>
+                        </Grid>
 
-                <TextBlock Grid.Row="2" Text="{Binding Apply.Summary}" Margin="0,10,0,6" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Row="3" Text="{Binding Apply.Summary}" Margin="0,14,0,8" FontWeight="SemiBold"/>
 
-                <DataGrid Grid.Row="3" ItemsSource="{Binding Apply.Plan}" AutoGenerateColumns="False"
-                          CanUserAddRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                          BorderBrush="#DDD" BorderThickness="1">
-                    <DataGrid.Columns>
-                        <DataGridCheckBoxColumn Header="Apply" Binding="{Binding Include, UpdateSourceTrigger=PropertyChanged}" Width="55"/>
-                        <DataGridTextColumn Header="Item" Binding="{Binding Label}" Width="2*"/>
-                        <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="Auto"/>
-                        <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="Auto"/>
-                        <DataGridTextColumn Header="Detail" Binding="{Binding Detail}" Width="3*"/>
-                    </DataGrid.Columns>
-                </DataGrid>
+                        <Border Grid.Row="4" Style="{StaticResource Card}" Padding="1">
+                            <DataGrid ItemsSource="{Binding Apply.Plan}">
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn Header="Apply" Width="64">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Style="{StaticResource CenteredCheckBox}"
+                                                          IsChecked="{Binding Include, UpdateSourceTrigger=PropertyChanged}"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Item" Binding="{Binding Label}" Width="2*" IsReadOnly="True"/>
+                                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="Auto" IsReadOnly="True"/>
+                                    <DataGridTemplateColumn Header="Action" Width="110"
+                                                            CellTemplate="{StaticResource ActionBadge}"/>
+                                    <DataGridTextColumn Header="Detail" Binding="{Binding Detail}" Width="3*" IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
+                                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
 
-                <Grid Grid.Row="4" Margin="0,8,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="220"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Secrets passphrase:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <PasswordBox Grid.Column="1" x:Name="ApplyPassphrase" Padding="4"
-                                 PasswordChanged="ApplyPassphrase_Changed" VerticalContentAlignment="Center"/>
-                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="Gray"
-                               Text="Plan previews before anything runs. Overwrites are backed up (.devprofile.bak)."/>
-                    <Button Grid.Column="3" Content="Cancel" Margin="0,0,8,0"
-                            Command="{Binding Apply.CancelCommand}"
-                            Visibility="{Binding Apply.IsBusy, Converter={StaticResource BoolToVis}}"/>
-                    <Button Grid.Column="4" Content="Apply" FontWeight="SemiBold" Command="{Binding Apply.ApplyCommand}"/>
-                </Grid>
+                        <Grid Grid.Row="5" Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="220"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Secrets passphrase" Style="{StaticResource FieldLabel}" Margin="0,0,10,0"/>
+                            <PasswordBox Grid.Column="1" x:Name="ApplyPassphrase" PasswordChanged="ApplyPassphrase_Changed"/>
+                            <TextBlock Grid.Column="2" Style="{StaticResource FieldLabel}" FontSize="12" Margin="12,0,0,0"
+                                       Text="Overwrites are backed up as *.devprofile.bak."/>
+                            <Button Grid.Column="3" Content="Cancel" Margin="0,0,10,0"
+                                    Command="{Binding Apply.CancelCommand}"
+                                    Visibility="{Binding Apply.IsBusy, Converter={StaticResource BoolToVis}}"/>
+                            <Button Grid.Column="4" Content="Apply" Style="{StaticResource PrimaryButton}"
+                                    Command="{Binding Apply.ApplyCommand}"/>
+                        </Grid>
 
-                <ProgressBar Grid.Row="5" Height="4" Margin="0,8,0,0" IsIndeterminate="True"
-                             Visibility="{Binding Apply.IsBusy, Converter={StaticResource BoolToVis}}"/>
+                        <ProgressBar Grid.Row="6" Margin="0,12,0,0" IsIndeterminate="True"
+                                     Visibility="{Binding Apply.IsBusy, Converter={StaticResource BoolToVis}}"/>
 
-                <TextBox Grid.Row="6" Style="{StaticResource LogBox}" Margin="0,6,0,0"
-                         Text="{Binding Apply.Log, Mode=OneWay}"/>
-            </Grid>
-        </TabItem>
-    </TabControl>
+                        <TextBox Grid.Row="7" Style="{StaticResource LogBox}" Margin="0,10,0,0"
+                                 Text="{Binding Apply.Log, Mode=OneWay}"/>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </Border>
 </Window>

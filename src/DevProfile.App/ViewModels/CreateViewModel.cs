@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using DevProfile.Core;
@@ -12,6 +14,7 @@ public sealed class CreateViewModel : ObservableObject
     private string _log = "";
     private string _passphrase = "";
     private bool _isBusy;
+    private string? _existingProfileSummary;
     private CancellationTokenSource? _cts;
 
     public CreateViewModel(ProfileService service)
@@ -28,14 +31,21 @@ public sealed class CreateViewModel : ObservableObject
             }));
 
         ExportCommand = new RelayCommand(ExportAsync, () => !IsBusy && !string.IsNullOrWhiteSpace(Destination));
+        RefreshCommand = new RelayCommand(RefreshAsync, () => !IsBusy && HasExistingProfile);
         CancelCommand = new RelayCommand(Cancel, () => IsBusy);
     }
 
     public ObservableCollection<ProviderRow> Rows { get; }
     public ICommand ExportCommand { get; }
+    public ICommand RefreshCommand { get; }
     public ICommand CancelCommand { get; }
 
-    public string Destination { get => _destination; set => Set(ref _destination, value); }
+    public string Destination
+    {
+        get => _destination;
+        set { if (Set(ref _destination, value)) _ = CheckExistingProfileAsync(value); }
+    }
+
     public string Log { get => _log; set => Set(ref _log, value); }
     public bool IsBusy { get => _isBusy; private set => Set(ref _isBusy, value); }
 
@@ -43,6 +53,15 @@ public sealed class CreateViewModel : ObservableObject
     public string Passphrase { get => _passphrase; set => _passphrase = value; }
 
     public bool SecretsSelected => Rows.Any(r => r.ContainsSecrets && r.IsSelected);
+
+    /// <summary>One-liner about the profile already in Destination; null when it isn't a bundle.</summary>
+    public string? ExistingProfileSummary
+    {
+        get => _existingProfileSummary;
+        private set { if (Set(ref _existingProfileSummary, value)) Raise(nameof(HasExistingProfile)); }
+    }
+
+    public bool HasExistingProfile => _existingProfileSummary is not null;
 
     private Task Cancel()
     {
@@ -83,6 +102,30 @@ public sealed class CreateViewModel : ObservableObject
         finally { IsBusy = false; }
     }
 
+    /// <summary>Peek at Destination for an existing bundle, so Export can offer Refresh instead.</summary>
+    private async Task CheckExistingProfileAsync(string destination)
+    {
+        string? summary = null;
+        try
+        {
+            if (Directory.Exists(destination))
+            {
+                var manifest = await _service.ReadManifestAsync(destination).ConfigureAwait(true);
+                if (manifest is not null)
+                {
+                    var stamp = manifest.UpdatedUtc ?? manifest.CreatedUtc;
+                    summary = DateTime.TryParse(stamp, null, DateTimeStyles.RoundtripKind, out var utc)
+                        ? $"“{manifest.Name}” — {manifest.Providers.Count} provider(s), last captured {utc.ToLocalTime():g}"
+                        : $"“{manifest.Name}” — {manifest.Providers.Count} provider(s)";
+                }
+            }
+        }
+        catch { /* unreadable/unsupported manifest -> treat as not a profile */ }
+
+        // The user may have kept typing while we read; only publish if still current.
+        if (destination == Destination) ExistingProfileSummary = summary;
+    }
+
     private async Task ExportAsync()
     {
         var selected = Rows.Where(r => r.IsSelected && r.Available).Select(r => r.Id).ToList();
@@ -103,6 +146,7 @@ public sealed class CreateViewModel : ObservableObject
         {
             await _service.ExportAsync(Destination, selected, options, Append, cts.Token).ConfigureAwait(true);
             Append($"\nProfile written to: {Destination}");
+            await CheckExistingProfileAsync(Destination).ConfigureAwait(true); // it's refreshable now
         }
         catch (OperationCanceledException)
         {
@@ -111,6 +155,44 @@ public sealed class CreateViewModel : ObservableObject
         catch (Exception ex)
         {
             Append($"! Export failed: {ex.Message}");
+        }
+        finally
+        {
+            IsBusy = false;
+            _cts = null;
+            cts.Dispose();
+        }
+    }
+
+    /// <summary>Re-capture the bundle already in Destination, keeping its provider selection.</summary>
+    private async Task RefreshAsync()
+    {
+        Log = "";
+        IsBusy = true;
+        var cts = new CancellationTokenSource();
+        _cts = cts;
+        try
+        {
+            var manifest = await _service.ReadManifestAsync(Destination, cts.Token).ConfigureAwait(true);
+            if (manifest is null) { Append("! No profile.json found — nothing to refresh."); return; }
+
+            if (manifest.Providers.Contains("secrets") && string.IsNullOrEmpty(Passphrase))
+            {
+                Append("! This profile contains encrypted secrets — enter the passphrase to refresh it.");
+                return;
+            }
+
+            var options = new ExportOptions(manifest.Providers.Contains("secrets") ? Passphrase : null);
+            await _service.RefreshAsync(Destination, options, Append, cts.Token).ConfigureAwait(true);
+            await CheckExistingProfileAsync(Destination).ConfigureAwait(true); // pick up the new timestamp
+        }
+        catch (OperationCanceledException)
+        {
+            Append("Cancelled.");
+        }
+        catch (Exception ex)
+        {
+            Append($"! Refresh failed: {ex.Message}");
         }
         finally
         {

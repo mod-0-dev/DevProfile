@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using System.Windows;
 using DevProfile.App.ViewModels;
 using Microsoft.Win32;
@@ -16,12 +17,27 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = _vm;
+        VersionText.Text = "v" + ShortVersion();
         Loaded += async (_, _) =>
         {
             HandleStartupArgs();
             await _vm.Create.DiscoverAsync();
         };
     }
+
+    private static string ShortVersion()
+    {
+        var info = System.Reflection.Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0";
+        return info.Split('+')[0]; // drop the build-metadata sha
+    }
+
+    private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void MaximizeRestore_Click(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
     /// <summary>After a "Restart as admin" relaunch we get "--apply &lt;folder&gt;" — jump straight to Apply.</summary>
     private void HandleStartupArgs()

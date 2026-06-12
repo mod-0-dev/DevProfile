@@ -190,4 +190,93 @@ public sealed class ProfileServiceTests : IDisposable
 
         Assert.Contains(log, l => l.Contains("Apply complete"));
     }
+
+    [Fact]
+    public async Task Apply_ReturnsCounts_ForAppliedAndPreflightSkipped()
+    {
+        var npm = new FakeProvider("npm-global") { PreflightReason = "npm isn't on PATH." };
+        var git = new FakeProvider("git-config");
+        var service = new ProfileService(new IProvider[] { npm, git });
+        var items = new[]
+        {
+            new PlanItem("npm-global", "typescript", "missing", PlanAction.Install),
+            new PlanItem("npm-global", "eslint", "missing", PlanAction.Install),
+            new PlanItem("git-config", ".gitconfig", "differs", PlanAction.Overwrite),
+        };
+
+        var result = await service.ApplyAsync(_dir, items, new ApplyOptions(), _ => { });
+
+        Assert.Equal(1, result.Applied);
+        Assert.Equal(0, result.Failed);
+        Assert.Equal(2, result.SkippedByPreflight);
+        Assert.False(result.Ok);
+    }
+
+    [Fact]
+    public async Task Refresh_RecapturesManifestProviders_KeepsCreatedUtc_StampsUpdatedUtc()
+    {
+        var inManifest = new FakeProvider("in");
+        var notInManifest = new FakeProvider("out");
+        var service = new ProfileService(new IProvider[] { inManifest, notInManifest });
+        await service.ExportAsync(_dir, new[] { "in" }, new ExportOptions(), _ => { });
+        var created = (await service.ReadManifestAsync(_dir))!.CreatedUtc;
+
+        var manifest = await service.RefreshAsync(_dir, new ExportOptions(), _ => { });
+
+        Assert.True(inManifest.Captured);
+        Assert.False(notInManifest.Captured);
+        Assert.Equal(created, manifest.CreatedUtc);
+        Assert.NotNull(manifest.UpdatedUtc);
+        // And the stamp is persisted, not just returned.
+        Assert.NotNull((await service.ReadManifestAsync(_dir))!.UpdatedUtc);
+    }
+
+    [Fact]
+    public async Task Refresh_WithoutManifest_Throws()
+    {
+        var service = new ProfileService(new[] { new FakeProvider("ok") });
+        await Assert.ThrowsAsync<InvalidDataException>(
+            () => service.RefreshAsync(_dir, new ExportOptions(), _ => { }));
+    }
+
+    [Fact]
+    public async Task Refresh_CaptureFailure_KeepsProviderInManifest()
+    {
+        // First export succeeds; the provider then starts failing (e.g. its CLI was uninstalled).
+        // Refresh must keep the provider listed — its previous capture is still on disk.
+        var flaky = new FlakyProvider("flaky");
+        var service = new ProfileService(new[] { (IProvider)flaky });
+        await service.ExportAsync(_dir, new[] { "flaky" }, new ExportOptions(), _ => { });
+        flaky.NowThrows = true;
+        var log = new List<string>();
+
+        var manifest = await service.RefreshAsync(_dir, new ExportOptions(), log.Add);
+
+        Assert.Equal(new[] { "flaky" }, manifest.Providers);
+        Assert.Contains(log, l => l.Contains("previous capture kept"));
+    }
+}
+
+/// <summary>Capture succeeds until <see cref="NowThrows"/> is flipped — for refresh-failure tests.</summary>
+file sealed class FlakyProvider : IProvider
+{
+    public FlakyProvider(string id) => Id = id;
+
+    public string Id { get; }
+    public string DisplayName => Id;
+    public ProviderCategory Category => ProviderCategory.Packages;
+    public bool ContainsSecrets => false;
+    public bool NowThrows { get; set; }
+
+    public Task<DiscoveryResult> DiscoverAsync(CancellationToken ct = default) =>
+        Task.FromResult(DiscoveryResult.Found("ok"));
+
+    public Task CaptureAsync(string profileDir, ExportOptions options, CancellationToken ct = default) =>
+        NowThrows ? throw new InvalidOperationException("capture boom") : Task.CompletedTask;
+
+    public Task<IReadOnlyList<PlanItem>> PlanAsync(string profileDir, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<PlanItem>>(Array.Empty<PlanItem>());
+
+    public Task ApplyAsync(string profileDir, PlanItem item, ApplyOptions options, Action<string> log, CancellationToken ct = default) =>
+        Task.CompletedTask;
 }

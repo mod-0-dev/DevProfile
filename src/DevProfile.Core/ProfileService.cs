@@ -71,6 +71,43 @@ public sealed class ProfileService
         log("Done.");
     }
 
+    /// <summary>
+    /// Re-capture an existing profile in place: same providers the manifest already lists,
+    /// fresh state from this machine. Keeps the profile's identity (Name / CreatedUtc) and
+    /// stamps UpdatedUtc. A provider whose capture fails keeps its previous data on disk and
+    /// stays in the manifest — refresh never makes a bundle smaller, only staler-or-newer.
+    /// </summary>
+    public async Task<ProfileManifest> RefreshAsync(
+        string profileDir,
+        ExportOptions options,
+        Action<string> log,
+        CancellationToken ct = default)
+    {
+        var manifest = await ReadManifestAsync(profileDir, ct).ConfigureAwait(false)
+            ?? throw new InvalidDataException("No profile.json found — this folder is not a DevProfile bundle.");
+
+        foreach (var provider in Providers.Where(p => manifest.Providers.Contains(p.Id)))
+        {
+            ct.ThrowIfCancellationRequested();
+            log($"Refreshing {provider.DisplayName}…");
+            try
+            {
+                await provider.CaptureAsync(profileDir, options, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                log($"  ! {provider.DisplayName} failed — previous capture kept: {ex.Message}");
+            }
+        }
+
+        manifest.UpdatedUtc = DateTime.UtcNow.ToString("O");
+        manifest.SourceMachine = Environment.MachineName;
+        manifest.SourceUser = Environment.UserName;
+        await File.WriteAllTextAsync(Path.Combine(profileDir, "profile.json"), Json.Write(manifest), ct).ConfigureAwait(false);
+        log("Refresh done.");
+        return manifest;
+    }
+
     public const string SupportedSchema = "devprofile/v1";
 
     public async Task<ProfileManifest?> ReadManifestAsync(string profileDir, CancellationToken ct = default)
@@ -131,7 +168,7 @@ public sealed class ProfileService
         : 2;
 
     /// <summary>Apply the given plan items (typically the non-Skip ones the user kept ticked).</summary>
-    public async Task ApplyAsync(
+    public async Task<ApplyResult> ApplyAsync(
         string profileDir,
         IEnumerable<PlanItem> items,
         ApplyOptions options,
@@ -143,6 +180,7 @@ public sealed class ProfileService
         var refreshed = false;
         var preflighted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase); // failed preflight -> all items skipped
+        int applied = 0, failed = 0, skippedByPreflight = 0;
 
         foreach (var item in ordered)
         {
@@ -175,17 +213,20 @@ public sealed class ProfileService
                     log($"  ! Skipping {provider.DisplayName} — {reason} ({n} item(s) not applied)");
                 }
             }
-            if (skip.Contains(item.ProviderId)) continue;
+            if (skip.Contains(item.ProviderId)) { skippedByPreflight++; continue; }
 
             try
             {
                 await provider.ApplyAsync(profileDir, item, options, log, ct).ConfigureAwait(false);
+                applied++;
             }
             catch (Exception ex)
             {
                 log($"  ! {item.Label}: {ex.Message}");
+                failed++;
             }
         }
         log("Apply complete.");
+        return new ApplyResult(applied, failed, skippedByPreflight);
     }
 }

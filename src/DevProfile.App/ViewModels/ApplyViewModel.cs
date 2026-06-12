@@ -100,7 +100,10 @@ public sealed class ApplyViewModel : ObservableObject
         var options = new ApplyOptions(needsPass ? Passphrase : null);
         try
         {
-            await _service.ApplyAsync(Source, items, options, Append, cts.Token).ConfigureAwait(true);
+            var result = await _service.ApplyAsync(Source, items, options, Append, cts.Token).ConfigureAwait(true);
+            Summary = result.Ok
+                ? $"Done — {result.Applied} item(s) applied."
+                : $"Done — {result.Applied} applied · {result.Failed} failed · {result.SkippedByPreflight} skipped (see log)";
         }
         catch (OperationCanceledException)
         {

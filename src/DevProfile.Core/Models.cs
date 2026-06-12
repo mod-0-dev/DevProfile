@@ -41,12 +41,20 @@ public sealed record ExportOptions(string? Passphrase = null);
 /// <summary>Options passed through an apply run.</summary>
 public sealed record ApplyOptions(string? Passphrase = null, bool BackupOnOverwrite = true);
 
+/// <summary>Outcome counts of an apply run, so callers (CLI exit code, UI summary) don't have to scrape the log.</summary>
+public sealed record ApplyResult(int Applied, int Failed, int SkippedByPreflight)
+{
+    public bool Ok => Failed == 0 && SkippedByPreflight == 0;
+}
+
 /// <summary>profile.json — the manifest written at the root of a profile bundle.</summary>
 public sealed class ProfileManifest
 {
     public string Schema { get; set; } = "devprofile/v1";
     public string Name { get; set; } = "MyProfile";
     public string CreatedUtc { get; set; } = "";
+    /// <summary>Set by Refresh; null until a profile has been re-captured in place.</summary>
+    public string? UpdatedUtc { get; set; }
     public string SourceMachine { get; set; } = "";
     public string SourceUser { get; set; } = "";
     /// <summary>Provider ids included in this bundle.</summary>

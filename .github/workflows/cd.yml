@@ -43,7 +43,7 @@ jobs:
       - name: Test
         run: dotnet test DevProfile.slnx --configuration Release
 
-      - name: Publish (self-contained, single file — no .NET install needed)
+      - name: Publish app (self-contained, single file — no .NET install needed)
         run: >
           dotnet publish src/DevProfile.App/DevProfile.App.csproj
           --configuration Release
@@ -54,17 +54,27 @@ jobs:
           -p:Version=${{ steps.ver.outputs.version }}
           --output publish/${{ matrix.rid }}
 
-      - name: Package zip
-        shell: pwsh
+      - name: Publish CLI (self-contained, single file)
         run: >
-          Compress-Archive
-          -Path publish/${{ matrix.rid }}/*
-          -DestinationPath ${{ steps.ver.outputs.asset }}-${{ matrix.rid }}.zip
+          dotnet publish src/DevProfile.Cli/DevProfile.Cli.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:Version=${{ steps.ver.outputs.version }}
+          --output publish-cli/${{ matrix.rid }}
+
+      - name: Package zips
+        shell: pwsh
+        run: |
+          Compress-Archive -Path publish/${{ matrix.rid }}/* -DestinationPath ${{ steps.ver.outputs.asset }}-${{ matrix.rid }}.zip
+          Compress-Archive -Path publish-cli/${{ matrix.rid }}/* -DestinationPath ${{ steps.ver.outputs.asset }}-cli-${{ matrix.rid }}.zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: DevProfile-${{ matrix.rid }}
-          path: ${{ steps.ver.outputs.asset }}-${{ matrix.rid }}.zip
+          path: '*.zip'
           if-no-files-found: error
 
   release:
@@ -100,7 +110,8 @@ jobs:
           files: dist/*.zip
           fail_on_unmatched_files: true
           body: |
-            Self-contained Windows build — no .NET install required.
-            Download the zip for your architecture, extract, and run `DevProfile.App.exe`.
+            Self-contained Windows builds — no .NET install required.
+            - GUI: download the zip for your architecture, extract, run `DevProfile.App.exe`.
+            - CLI: download the `-cli-` zip, extract, run `devprofile.exe` (`devprofile help`).
 
             Built from commit ${{ github.sha }}.
