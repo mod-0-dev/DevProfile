@@ -6,6 +6,34 @@ namespace DevProfile.Core;
 public sealed record ProcessResult(int ExitCode, string StdOut, string StdErr)
 {
     public bool Ok => ExitCode == 0;
+
+    /// <summary>
+    /// A one-line reason for a non-zero exit, prefixed with the code. When the process failed
+    /// to even start, <see cref="ProcessRunner"/> puts the OS message ("The system cannot find
+    /// the file specified.") in stderr, so this surfaces *why* a CLI didn't run instead of a
+    /// bare "exit -1" that reads like nothing happened. Falls back to the code alone when the
+    /// child printed nothing.
+    /// </summary>
+    /// <remarks>
+    /// stderr is the error channel — its lines are collapsed together because the message is
+    /// often multi-line (e.g. cmd's "'npm' is not recognized…" / "operable program or batch
+    /// file."), and the headline is the *first* line, not the last. stdout is only used as a
+    /// fallback (chatty CLIs like winget print progress there then the verdict last), so we
+    /// take its concluding line. Output is capped so a stack trace can't flood the log.
+    /// </remarks>
+    public string ShortError(int maxLength = 200)
+    {
+        string[] Lines(string s) =>
+            s.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var err = Lines(StdErr);
+        var msg = err.Length > 0
+            ? string.Join(" ", err)                       // stderr: whole (usually short) error
+            : Lines(StdOut).LastOrDefault();              // stdout: the concluding line
+        if (string.IsNullOrEmpty(msg)) return $"exit {ExitCode}";
+        if (msg.Length > maxLength) msg = msg[..maxLength] + "…";
+        return $"exit {ExitCode}: {msg}";
+    }
 }
 
 /// <summary>Thin wrapper for shelling out to CLIs (winget, git, code, npm, dotnet, pwsh).</summary>

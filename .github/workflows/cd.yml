@@ -1,0 +1,104 @@
+name: CD
+
+# Push/merge to main (or master) publishes a rolling "latest" prerelease.
+# Pushing a tag like v1.2.3 publishes a normal versioned release.
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Add win-arm64 here to also ship an ARM64 build.
+        rid: [win-x64]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Compute version
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            v="${{ github.ref_name }}"; v="${v#v}"          # v1.2.3 -> 1.2.3
+          else
+            v="0.1.0-ci.${{ github.run_number }}"           # rolling main build
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      # Gate the release on a green test run so we never ship a broken package.
+      - name: Test
+        run: dotnet test DevProfile.slnx --configuration Release
+
+      - name: Publish (self-contained, single file — no .NET install needed)
+        run: >
+          dotnet publish src/DevProfile.App/DevProfile.App.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:Version=${{ steps.ver.outputs.version }}
+          --output publish/${{ matrix.rid }}
+
+      - name: Package zip
+        shell: pwsh
+        run: >
+          Compress-Archive
+          -Path publish/${{ matrix.rid }}/*
+          -DestinationPath DevProfile-${{ steps.ver.outputs.version }}-${{ matrix.rid }}.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DevProfile-${{ matrix.rid }}
+          path: DevProfile-*-${{ matrix.rid }}.zip
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the release and move the rolling "latest" tag
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Release metadata
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "tag=${{ github.ref_name }}"              >> "$GITHUB_OUTPUT"
+            echo "name=${{ github.ref_name }}"             >> "$GITHUB_OUTPUT"
+            echo "prerelease=false"                        >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest"                              >> "$GITHUB_OUTPUT"
+            echo "name=Latest build (main @ ${GITHUB_SHA::7})" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true"                         >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.name }}
+          prerelease: ${{ steps.meta.outputs.prerelease }}
+          files: dist/*.zip
+          fail_on_unmatched_files: true
+          body: |
+            Self-contained Windows build — no .NET install required.
+            Download the zip for your architecture, extract, and run `DevProfile.App.exe`.
+
+            Built from commit ${{ github.sha }}.

@@ -20,6 +20,15 @@ public interface IProvider
     /// <summary>Inspect the current machine: is there anything to capture, and a short detail string.</summary>
     Task<DiscoveryResult> DiscoverAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Fast precondition check run once, after the PATH refresh, before any of this provider's
+    /// items are applied. Return a concrete, actionable reason to skip ALL of them (e.g. the
+    /// required CLI isn't on PATH because its runtime was never installed); return null to
+    /// proceed. Lets the orchestrator emit one clear message instead of letting each item fail
+    /// with a cryptic exit code. Default: always proceed.
+    /// </summary>
+    Task<string?> PreflightAsync(CancellationToken ct = default) => Task.FromResult<string?>(null);
+
     /// <summary>Write this provider's state into <paramref name="profileDir"/> (already created).</summary>
     Task CaptureAsync(string profileDir, ExportOptions options, CancellationToken ct = default);
 

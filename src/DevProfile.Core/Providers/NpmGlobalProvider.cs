@@ -19,6 +19,11 @@ public sealed class NpmGlobalProvider : IProvider
         return DiscoveryResult.Found($"{pkgs.Count} package(s)");
     }
 
+    public async Task<string?> PreflightAsync(CancellationToken ct = default) =>
+        await ProcessRunner.ExistsAsync("npm", ct).ConfigureAwait(false)
+            ? null
+            : "npm isn't on PATH — install Node.js (winget id OpenJS.NodeJS), then re-apply.";
+
     public async Task CaptureAsync(string profileDir, ExportOptions options, CancellationToken ct = default)
     {
         // Null means npm itself failed — fail the capture rather than writing an empty
@@ -57,7 +62,7 @@ public sealed class NpmGlobalProvider : IProvider
         }
         log($"  npm i -g {item.Label}");
         var r = await ProcessRunner.RunCmdAsync($"npm install -g {item.Label}", ct).ConfigureAwait(false);
-        if (!r.Ok) log($"    ! exit {r.ExitCode}");
+        if (!r.Ok) log($"    ! {r.ShortError()}");
     }
 
     /// <summary>Returns null if npm is unavailable; otherwise the global package names.</summary>

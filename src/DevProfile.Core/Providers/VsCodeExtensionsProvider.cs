@@ -17,6 +17,11 @@ public sealed class VsCodeExtensionsProvider : IProvider
         return DiscoveryResult.Found($"{ext.Count} extension(s)");
     }
 
+    public async Task<string?> PreflightAsync(CancellationToken ct = default) =>
+        await ProcessRunner.ExistsAsync("code", ct).ConfigureAwait(false)
+            ? null
+            : "the code command isn't on PATH — install VS Code (winget id Microsoft.VisualStudioCode) with the \"Add to PATH\" option, then re-apply.";
+
     public async Task CaptureAsync(string profileDir, ExportOptions options, CancellationToken ct = default)
     {
         var ext = await ListAsync(ct).ConfigureAwait(false)
@@ -52,7 +57,7 @@ public sealed class VsCodeExtensionsProvider : IProvider
         }
         log($"  code --install-extension {item.Label}");
         var r = await ProcessRunner.RunCmdAsync($"code --install-extension {item.Label} --force", ct).ConfigureAwait(false);
-        if (!r.Ok) log($"    ! exit {r.ExitCode}");
+        if (!r.Ok) log($"    ! {r.ShortError()}");
     }
 
     private static async Task<List<string>?> ListAsync(CancellationToken ct)

@@ -19,6 +19,21 @@ public sealed class DotnetToolProvider : IProvider
         return DiscoveryResult.Found($"{tools.Count} tool(s)");
     }
 
+    public async Task<string?> PreflightAsync(CancellationToken ct = default)
+    {
+        if (!await ProcessRunner.ExistsAsync("dotnet", ct).ConfigureAwait(false))
+            return "the dotnet command isn't on PATH — install the .NET SDK (winget id Microsoft.DotNet.SDK.10), then re-apply.";
+
+        // `dotnet` ships with the runtime alone, but `dotnet tool install` needs an SDK — the
+        // friend's machine had the runtime (enough to run DevProfile) and no SDK. An empty
+        // --list-sdks (it still exits 0) means runtime-only. On any oddity, proceed rather than
+        // wrongly skip; the real error then surfaces via ProcessResult.ShortError().
+        var r = await ProcessRunner.RunAsync("dotnet", new[] { "--list-sdks" }, ct).ConfigureAwait(false);
+        if (r.Ok && string.IsNullOrWhiteSpace(r.StdOut))
+            return "only the .NET runtime is installed, not the SDK — `dotnet tool install` needs the SDK (winget id Microsoft.DotNet.SDK.10).";
+        return null;
+    }
+
     public async Task CaptureAsync(string profileDir, ExportOptions options, CancellationToken ct = default)
     {
         var tools = await ListAsync(ct).ConfigureAwait(false)
@@ -56,7 +71,7 @@ public sealed class DotnetToolProvider : IProvider
         log($"  dotnet tool install -g {item.Label}");
         var r = await ProcessRunner.RunAsync(
             "dotnet", new[] { "tool", "install", "-g", item.Label }, ct).ConfigureAwait(false);
-        if (!r.Ok) log($"    ! exit {r.ExitCode}");
+        if (!r.Ok) log($"    ! {r.ShortError()}");
     }
 
     /// <summary>Null when the command itself failed (as opposed to listing zero tools).</summary>

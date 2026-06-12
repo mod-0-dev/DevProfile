@@ -72,7 +72,7 @@ public sealed class WingetProvider : IProvider
                 "--silent", "--disable-interactivity",
             },
             ct).ConfigureAwait(false);
-        if (!r.Ok) log($"    ! exit {r.ExitCode}");
+        if (!r.Ok) log($"    ! {r.ShortError()}");
         _installedCache = null; // machine state changed
     }
 

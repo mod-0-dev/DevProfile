@@ -110,14 +110,25 @@ public sealed class ProfileService
     }
 
     /// <summary>
-    /// Providers that install the runtimes/tools other providers depend on (VS Code, Node,
-    /// the .NET SDK). These must run first; afterwards we refresh PATH in-process so the
-    /// tool-consuming providers (code/npm/dotnet) can find what was just installed.
+    /// Apply runs in dependency phases:
+    ///  <list type="number">
+    ///   <item>tool installers (winget) — provide the runtimes later steps shell out to;
+    ///         afterwards PATH is refreshed in-process so code/npm/dotnet become callable.</item>
+    ///   <item>credentials those steps read — secrets restores <c>~/.npmrc</c>, so it must land
+    ///         before <c>npm i -g</c> can need a private-registry token from it.</item>
+    ///   <item>everything else: the tool consumers (npm/dotnet/code) and the config file copies,
+    ///         which are mutually independent.</item>
+    ///  </list>
     /// </summary>
     private static readonly HashSet<string> ToolInstallerIds =
         new(StringComparer.OrdinalIgnoreCase) { "winget" };
+    private static readonly HashSet<string> CredentialIds =
+        new(StringComparer.OrdinalIgnoreCase) { "secrets" };
 
-    private static int Phase(string providerId) => ToolInstallerIds.Contains(providerId) ? 0 : 1;
+    private static int Phase(string providerId) =>
+        ToolInstallerIds.Contains(providerId) ? 0
+        : CredentialIds.Contains(providerId) ? 1
+        : 2;
 
     /// <summary>Apply the given plan items (typically the non-Skip ones the user kept ticked).</summary>
     public async Task ApplyAsync(
@@ -130,6 +141,8 @@ public sealed class ProfileService
         // OrderBy is a stable sort, so original order is preserved within each phase.
         var ordered = items.OrderBy(i => Phase(i.ProviderId)).ToList();
         var refreshed = false;
+        var preflighted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase); // failed preflight -> all items skipped
 
         foreach (var item in ordered)
         {
@@ -146,6 +159,24 @@ public sealed class ProfileService
 
             var provider = Find(item.ProviderId);
             if (provider is null) continue;
+
+            // Preflight once per provider (now that PATH is refreshed, so a just-installed tool
+            // counts): if its prerequisite is missing, skip ALL its items with one concrete
+            // message instead of letting each fail with a cryptic exit code.
+            if (preflighted.Add(item.ProviderId))
+            {
+                string? reason;
+                try { reason = await provider.PreflightAsync(ct).ConfigureAwait(false); }
+                catch (Exception ex) { reason = ex.Message; }
+                if (reason is not null)
+                {
+                    skip.Add(item.ProviderId);
+                    int n = ordered.Count(i => string.Equals(i.ProviderId, item.ProviderId, StringComparison.OrdinalIgnoreCase));
+                    log($"  ! Skipping {provider.DisplayName} — {reason} ({n} item(s) not applied)");
+                }
+            }
+            if (skip.Contains(item.ProviderId)) continue;
+
             try
             {
                 await provider.ApplyAsync(profileDir, item, options, log, ct).ConfigureAwait(false);
