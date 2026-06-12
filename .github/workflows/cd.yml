@@ -17,8 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Add win-arm64 here to also ship an ARM64 build.
-        rid: [win-x64]
+        rid: [win-x64, win-arm64]
     steps:
       - uses: actions/checkout@v5
 
